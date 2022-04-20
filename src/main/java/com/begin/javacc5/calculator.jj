@@ -1,5 +1,6 @@
 options {
     STATIC = false ;
+//    OUTPUT_DIRECTORY = "com.begin.javacc5";
 }
 PARSER_BEGIN(Calculator)
     import java.io.PrintStream ;
@@ -20,8 +21,8 @@ TOKEN : { < PLUS : "+" > }
 TOKEN : { < MINUS : "-" > }
 TOKEN : { < TIMES : "*" > }
 TOKEN : { < DIVIDE : "/" > }
-TOKEN : { < OPEN_PAR : "(" > }
-TOKEN : { < CLOSE_PAR : ")" > }
+TOKEN : { < LC : "(" > }
+TOKEN : { < RC : ")" > }
 TOKEN : { < PREVIOUS : "$" > }
 TOKEN : { < NUMBER : <DIGITS>
                    | <DIGITS> "." <DIGITS>
@@ -65,70 +66,51 @@ TOKEN :
 
 TOKEN :
 {
-    <ID: <LETTER> (<LETTER> | <DIGITS> | "_")*>
+    <VAR: "[" (<LETTER> | <DIGITS>)* "]">
 }
 
 TOKEN :
 {
-    <FUN_SIGN : <ID><OPEN_PAR>>
+    <FUN : <LETTER> (<LETTER> | <DIGITS> | "_" )* >
 }
 
-void Start(PrintStream printStream) throws NumberFormatException :
+FunCall Start(PrintStream printStream) throws NumberFormatException :
 {
-    Object value;
+    FunCall value;
 }
 {
-    value = Function2()
+    value = Function()
     <EOL>
     {
-        System.out.println(value);
+        return value;
     }
 }
 
-void Function():
-{}
+FunCall Function():
 {
-    <FUN_SIGN>
-        (<NUMBER>|<ID>|Function())
-        (
-            <DOT>
-            (<NUMBER>|<ID>|Function())
-        )*
-    <CLOSE_PAR>
-
-}
-
-Object Function2():
-{
-    Token val;
-    Token fun;
-    java.util.List<Token> args = new java.util.ArrayList<Token>();
+    Object val;
+    FunCall call = new FunCall();
 }
 {
-    fun = <FUN_SIGN>
+call.fun = <FUN>
+    <LC>
         (
-            val = <NUMBER>|val = <ID>
+            val = <NUMBER>
+           |val = <VAR>
+           |val = Function()
         )
-        {args.add(val);}
+        {call.args.add(val);}
         (
             <DOT>
-            (val = <NUMBER>|val = <ID>)
-            {args.add(val);}
+           (
+            val = <NUMBER>
+           |val = <VAR>
+           |val = Function()
+           )
+            {call.args.add(val);}
         )*
-    <CLOSE_PAR>
+    <RC>
     {
-        String s = fun.image.substring(0, fun.image.length()-1);
-
-        if ("sum".equals(s)) {
-            double sum = 0;
-            for (Token x : args) {
-                sum += Double.parseDouble(x.image);
-            }
-            return sum;
-        }
-
-        return null;
-
+        return call;
     }
-
 }
