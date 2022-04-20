@@ -1,0 +1,189 @@
+options {
+    STATIC = false ;
+}
+PARSER_BEGIN(Calculator)
+    import java.io.PrintStream ;
+    class Calculator {
+        public static void main( String[] args )
+            throws ParseException, TokenMgrError, NumberFormatException {
+            Calculator parser = new Calculator( System.in ) ;
+            parser.Start( System.out ) ;
+        }
+        double previousValue = 0.0 ;
+    }
+PARSER_END(Calculator)
+
+
+SKIP : { " " }
+TOKEN : { < EOL : "\n" | "\r" | "\r\n" > }
+TOKEN : { < PLUS : "+" > }
+TOKEN : { < MINUS : "-" > }
+TOKEN : { < TIMES : "*" > }
+TOKEN : { < DIVIDE : "/" > }
+TOKEN : { < OPEN_PAR : "(" > }
+TOKEN : { < CLOSE_PAR : ")" > }
+TOKEN : { < PREVIOUS : "$" > }
+TOKEN : { < NUMBER : <DIGITS>
+                   | <DIGITS> "." <DIGITS>
+                   | <DIGITS> "."
+                   | "."<DIGITS> >
+        }
+TOKEN : { < #DIGITS : (["0"-"9"])+ > }
+
+// 支持IF
+TOKEN : {
+
+    < IF : "if">
+}
+
+TOKEN :
+{
+	< LT:"<"  >
+  | < LE:"<=" >
+  | < GT:">"  >
+  | < GE:">=" >
+  | < EQ:"==" >
+  | < NE:"!=" >
+}
+
+TOKEN :
+{
+    <LB : "{">
+   |<RB : "}">
+}
+
+// 支持function
+TOKEN :
+{
+    <#LETTER: ["A"-"Z", "a"-"z"]>
+}
+
+TOKEN :
+{
+    <ID: <LETTER> (<LETTER> | <DIGITS> | "_")>
+}
+
+
+void Start(PrintStream printStream) throws NumberFormatException :
+{
+    double value;
+}
+{
+//    (
+//        previousValue = Expression()
+//        <EOL> { printStream.println( previousValue ) ; }
+//    )*
+    value = ifStat()
+    <EOL>
+    {printStream.println(value);}
+}
+
+double ifStat():
+{
+    boolean con;
+    double result;
+}
+{
+
+   <IF><OPEN_PAR>con = Condition()<CLOSE_PAR>
+
+   {
+    if (con == false) {
+        while(!token.image.equals("}")) {
+            token = getNextToken();
+        }
+        return -1;
+    }
+   }
+
+   <LB>result = Expression()<RB>
+
+    {return result;}
+}
+
+boolean Condition():
+{
+    boolean result;
+    double v1, v2;
+
+}
+{
+    v1 = Expression()
+    (
+        < LT>
+            v2 = Expression()
+            {result = v1 < v2;}
+        |< LE>
+            v2 = Expression()
+            {result = v1 <= v2;}
+        |< GT>
+            v2 = Expression()
+            {result = v1 > v2;}
+        |< GE>
+            v2 = Expression()
+            {result = v1 >= v2;}
+        |< EQ>
+            v2 = Expression()
+            {result = v1 == v2;}
+        |< NE>
+            v2 = Expression()
+            {result = v1 != v2;}
+    )
+    {
+        return result;
+    }
+}
+
+double Expression() throws NumberFormatException :
+{
+    double i ;
+    double value ;
+}
+{
+    value = Term()
+    (
+        <PLUS>
+        i = Term()
+        { value += i ; }
+      | <MINUS>
+        i = Term()
+        { value -= i ; }
+    )*
+    { return value ; }
+}
+
+double Term() throws NumberFormatException :
+{
+    double i ;
+    double value ;
+}
+{
+    value = Primary()
+    (
+        <TIMES>
+        i = Primary()
+        { value *= i ; }
+      | <DIVIDE>
+        i = Primary()
+        { value /= i ; }
+    )*
+    { return value ; }
+}
+
+double Primary() throws NumberFormatException :
+{
+Token t ;
+double d ;
+}
+{
+    t=<NUMBER>
+    { return Double.parseDouble( t.image ) ; }
+|   <PREVIOUS>
+    { return previousValue ; }
+|   <OPEN_PAR> d=Expression() <CLOSE_PAR>
+    { return d ; }
+|   <MINUS> d=Primary()
+    { return -d ; }
+|   Function()
+
+}

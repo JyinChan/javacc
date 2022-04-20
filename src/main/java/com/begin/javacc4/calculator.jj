@@ -1,0 +1,156 @@
+options {
+    STATIC = false ;
+}
+PARSER_BEGIN(Calculator)
+    import java.io.PrintStream ;
+    class Calculator {
+        public static void main( String[] args )
+            throws ParseException, TokenMgrError, NumberFormatException {
+            Calculator parser = new Calculator( System.in ) ;
+            parser.Start( System.out ) ;
+        }
+        double previousValue = 0.0 ;
+    }
+PARSER_END(Calculator)
+
+
+SKIP : { " " }
+TOKEN : { < EOL : "\n" | "\r" | "\r\n" > }
+TOKEN : { < PLUS : "+" > }
+TOKEN : { < MINUS : "-" > }
+TOKEN : { < TIMES : "*" > }
+TOKEN : { < DIVIDE : "/" > }
+TOKEN : { < OPEN_PAR : "(" > }
+TOKEN : { < CLOSE_PAR : ")" > }
+TOKEN : { < PREVIOUS : "$" > }
+TOKEN : { < NUMBER : <DIGITS>
+                   | <DIGITS> "." <DIGITS>
+                   | <DIGITS> "."
+                   | "."<DIGITS> >
+        }
+TOKEN : { < #DIGITS : (["0"-"9"])+ > }
+
+// 支持IF
+TOKEN : {
+
+    < IF : "if">
+}
+
+TOKEN :
+{
+	< LT:"<"  >
+  | < LE:"<=" >
+  | < GT:">"  >
+  | < GE:">=" >
+  | < EQ:"==" >
+  | < NE:"!=" >
+}
+
+TOKEN :
+{
+    <LB : "{">
+   |<RB : "}">
+}
+
+TOKEN :
+{
+    <DOT : ",">
+}
+
+// 支持function
+TOKEN :
+{
+    <#LETTER: ["A"-"Z", "a"-"z"]>
+}
+
+TOKEN :
+{
+    <ID: <LETTER> (<LETTER> | <DIGITS> | "_")*>
+}
+
+TOKEN :
+{
+    <FUN_SIGN : <ID><OPEN_PAR>>
+}
+
+void Start(PrintStream printStream) throws NumberFormatException :
+{
+    Object value;
+}
+{
+    value = Function3()
+    <EOL>
+    {
+        System.out.println(value);
+    }
+}
+
+void Function():
+{}
+{
+    <FUN_SIGN>
+        (<NUMBER>|<ID>|Function())
+        (
+            <DOT>
+            (<NUMBER>|<ID>|Function())
+        )*
+    <CLOSE_PAR>
+
+}
+
+Object Function2():
+{
+    Token val;
+    Token fun;
+    java.util.List<Token> args = new java.util.ArrayList<Token>();
+}
+{
+    fun = <FUN_SIGN>
+        (
+            val = <NUMBER>|val = <ID>
+        )
+        {args.add(val);}
+        (
+            <DOT>
+            (val = <NUMBER>|val = <ID>)
+            {args.add(val);}
+        )*
+    <CLOSE_PAR>
+    {
+        String s = fun.image.substring(0, fun.image.length()-1);
+
+        if ("sum".equals(s)) {
+            double sum = 0;
+            for (Token x : args) {
+                sum += Double.parseDouble(x.image);
+            }
+            return sum;
+        }
+
+        return null;
+
+    }
+
+}
+
+FunCall Function3():
+{
+    Object val;
+    FunCall call = new FunCall();
+}
+{
+call.fun = <FUN_SIGN>
+        (
+            val = <NUMBER>|val = <ID>|val = Function3()
+        )
+        {call.args.add(val);}
+        (
+            <DOT>
+            (val = <NUMBER>|val = <ID>|val = Function3())
+            {call.args.add(val);}
+        )*
+    <CLOSE_PAR>
+    {
+        return call;
+    }
+}
