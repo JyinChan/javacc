@@ -1,6 +1,5 @@
 options {
     STATIC = false ;
-//    OUTPUT_DIRECTORY = "com.begin.javacc5";
 }
 PARSER_BEGIN(Calculator)
     import java.io.PrintStream ;
@@ -8,9 +7,17 @@ PARSER_BEGIN(Calculator)
         public static void main( String[] args )
             throws ParseException, TokenMgrError, NumberFormatException {
             Calculator parser = new Calculator( System.in ) ;
-            parser.Start( System.out ) ;
+            Exp exp = parser.start();
         }
-        double previousValue = 0.0 ;
+
+        private static final String DQ = '"' + "";
+
+        private static String stripQuotes(
+            String s, String prefix, String suffix) {
+            assert s.startsWith(prefix) && s.endsWith(suffix);
+            s = s.substring(prefix.length(), s.length() - suffix.length());
+            return s;
+        }
     }
 PARSER_END(Calculator)
 
@@ -23,7 +30,6 @@ TOKEN : { < TIMES : "*" > }
 TOKEN : { < DIVIDE : "/" > }
 TOKEN : { < LC : "(" > }
 TOKEN : { < RC : ")" > }
-TOKEN : { < PREVIOUS : "$" > }
 TOKEN : { < NUMBER : <DIGITS>
                    | <DIGITS> "." <DIGITS>
                    | <DIGITS> "."
@@ -31,10 +37,29 @@ TOKEN : { < NUMBER : <DIGITS>
         }
 TOKEN : { < #DIGITS : (["0"-"9"])+ > }
 
+TOKEN :
+{
+    <LB : "{">
+   |<RB : "}">
+}
+
+TOKEN : { <COMMA : ","> }
+
+TOKEN : {
+    < SINGLE_QUOTED_STRING: "'" ( (~["'"]) | ("''"))* "'" >
+    |
+    < DOUBLE_QUOTED_STRING: "\"" ( (~["\""]) | ("\"\""))* "\"" >
+}
+
 // 支持IF
 TOKEN : {
-
-    < IF : "if">
+    < IF : "if"|"IF">
+   |
+    < ELSEIF : "elseif"|"ELSEIF">
+   |
+    < ELSE : "else"|"ELSE">
+   |
+    < END : "end"|"END">
 }
 
 TOKEN :
@@ -47,70 +72,229 @@ TOKEN :
   | < NE:"!=" >
 }
 
-TOKEN :
-{
-    <LB : "{">
-   |<RB : "}">
-}
-
-TOKEN :
-{
-    <DOT : ",">
-}
-
 // 支持function
 TOKEN :
 {
     <#LETTER: ["A"-"Z", "a"-"z"]>
-}
-
-TOKEN :
-{
-    <VAR: "[" (<LETTER> | <DIGITS>)* "]">
-}
-
-TOKEN :
-{
+   |
+    <VAR: "[" (
+            (~["]","\n","\r"])
+          | ("]]")
+        )* "]">
+   |
     <FUN : <LETTER> (<LETTER> | <DIGITS> | "_" )* >
 }
 
-FunCall Start(PrintStream printStream) throws NumberFormatException :
+Exp start() throws NumberFormatException :
 {
-    FunCall value;
+    Exp exp;
 }
 {
-    value = Function()
+    (
+        exp = expression()
+       |
+        exp = ifStatement()
+    )
     <EOL>
     {
-        return value;
+        return exp;
     }
 }
 
-FunCall Function():
+Exp function():
 {
-    Object val;
-    FunCall call = new FunCall();
+    String name;
+    java.util.List<Exp> args = new java.util.ArrayList<Exp>();
+    Exp exp;
 }
 {
-call.fun = <FUN>
+    <FUN>
+        {
+            name = token.image;
+        }
     <LC>
+        exp = expression() {
+            args.add(exp);
+        }
         (
-            val = <NUMBER>
-           |val = <VAR>
-           |val = Function()
-        )
-        {call.args.add(val);}
-        (
-            <DOT>
-           (
-            val = <NUMBER>
-           |val = <VAR>
-           |val = Function()
-           )
-            {call.args.add(val);}
+            <COMMA>
+            exp = expression() {
+                args.add(exp);
+            }
         )*
     <RC>
     {
-        return call;
+        return new UnresolvedFunCall(name, args);
     }
+}
+
+Exp ifStatement():
+{
+    Exp exp;
+    java.util.List<Exp> args = new java.util.ArrayList<Exp>();
+}
+{
+
+   <IF>
+       <LC>
+           exp = expression() {
+               args.add(exp);
+           }
+       <RC>
+   <LB>
+       exp = expression() {
+           args.add(exp);
+       }
+   <RB>
+   (
+        <ELSEIF>
+            <LC>
+                exp = expression() {
+                    args.add(exp);
+                }
+            <RC>
+        <LB>
+            exp = expression() {
+                args.add(exp);
+            }
+        <RB>
+   )*
+   <ELSE>
+       <LB>
+           exp = expression() {
+               args.add(exp);
+           }
+       <RB>
+//   <END>
+   {
+       return new UnresolvedFunCall("IF", Syntax.IF, args);
+   }
+}
+
+Exp expression():
+{
+    Exp exp, exp2;
+}
+{
+    exp = term2()
+    (
+        < LT>
+            exp2 = term2() {
+                return new UnresolvedFunCall("<", Syntax.Infix, new Exp[]{exp, exp2});
+            }
+       |
+        < LE>
+            exp2 = term2() {
+                return new UnresolvedFunCall("<=", Syntax.Infix, new Exp[]{exp, exp2});
+            }
+       |
+        < GT>
+            exp2 = term2() {
+                return new UnresolvedFunCall(">", Syntax.Infix, new Exp[]{exp, exp2});
+            }
+       |
+        < GE>
+            exp2 = term2() {
+                return new UnresolvedFunCall(">=", Syntax.Infix, new Exp[]{exp, exp2});
+            }
+       |
+        < EQ>
+            exp2 = term2() {
+                return new UnresolvedFunCall("==", Syntax.Infix, new Exp[]{exp, exp2});
+            }
+       |
+        < NE>
+            exp2 = term2() {
+                return new UnresolvedFunCall("!=", Syntax.Infix, new Exp[]{exp, exp2});
+            }
+    )?
+    {
+        return exp;
+    }
+}
+
+Exp term2():
+{
+    Exp exp, exp2;
+}
+{
+    exp = term()
+    (
+        <PLUS> exp2 = term() {
+            exp = new UnresolvedFunCall("+", Syntax.Infix, new Exp[]{exp, exp2});
+        }
+       |
+        <MINUS> exp2 = term() {
+            exp = new UnresolvedFunCall("-", Syntax.Infix, new Exp[]{exp, exp2});
+        }
+    )*
+    { return exp ; }
+}
+
+Exp term():
+{
+    Exp exp, exp2;
+}
+{
+    exp = factor()
+    (
+        <TIMES> exp2 = factor() {
+            exp = new UnresolvedFunCall("*", Syntax.Infix, new Exp[]{exp, exp2});
+        }
+       |
+        <DIVIDE> exp2 = factor() {
+            exp = new UnresolvedFunCall("/", Syntax.Infix, new Exp[]{exp, exp2});
+        }
+    )*
+    { return exp ; }
+}
+
+Exp factor() :
+{
+    Exp exp;
+}
+{
+    exp = primary() {
+        return exp;
+    }
+   |
+    <PLUS> exp = primary() {
+        return exp;
+    }
+   |
+    <MINUS> exp = primary() {
+        return new UnresolvedFunCall("-", Syntax.Prefix, new Exp[] {exp});
+    }
+}
+
+Exp primary():
+{
+    Exp exp;
+}
+{
+
+    <NUMBER> {
+        return Literal.createNumber(token.image);
+    }
+   |
+    <SINGLE_QUOTED_STRING> {
+        return Literal.createString(stripQuotes(token.image, "'", "'"));
+    }
+   |
+    <DOUBLE_QUOTED_STRING> {
+        return Literal.createString(stripQuotes(token.image, DQ, DQ));
+    }
+   |
+    <VAR> {
+        return new UnresolvedFunCall(token.image, Syntax.Var, new Exp[0]);
+    }
+   |
+    <LC> exp = expression() <RC> {
+        return exp;
+    }
+   |
+    exp = function() {
+        return exp;
+    }
+
 }

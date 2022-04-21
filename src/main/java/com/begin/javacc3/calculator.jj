@@ -184,6 +184,5 @@ double d ;
     { return d ; }
 |   <MINUS> d=Primary()
     { return -d ; }
-|   Function()
 
 }
