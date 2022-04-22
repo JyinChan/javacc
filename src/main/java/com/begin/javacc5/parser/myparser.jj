@@ -1,12 +1,18 @@
 options {
     STATIC = false ;
+    OUTPUT_DIRECTORY = "generated";
 }
-PARSER_BEGIN(Calculator)
-    import java.io.PrintStream ;
-    class Calculator {
+PARSER_BEGIN(MyParser)
+
+    package com.begin.javacc5.parser.generated;
+
+    import com.begin.javacc5.parser.*;
+    import com.begin.javacc5.parser.exp.*;
+
+    public class MyParser {
         public static void main( String[] args )
             throws ParseException, TokenMgrError, NumberFormatException {
-            Calculator parser = new Calculator( System.in ) ;
+            MyParser parser = new MyParser( System.in ) ;
             Exp exp = parser.start();
         }
 
@@ -19,7 +25,7 @@ PARSER_BEGIN(Calculator)
             return s;
         }
     }
-PARSER_END(Calculator)
+PARSER_END(MyParser)
 
 
 SKIP : { " " }
@@ -124,7 +130,7 @@ Exp function():
         )*
     <RC>
     {
-        return new UnresolvedFunCall(name, args);
+        return new UnresolvedExp(name, args);
     }
 }
 
@@ -167,7 +173,7 @@ Exp ifStatement():
        <RB>
 //   <END>
    {
-       return new UnresolvedFunCall("IF", Syntax.IF, args);
+       return new UnresolvedExp("IF", Syntax.IF, args);
    }
 }
 
@@ -180,32 +186,32 @@ Exp expression():
     (
         < LT>
             exp2 = term2() {
-                return new UnresolvedFunCall("<", Syntax.Infix, new Exp[]{exp, exp2});
+                return new UnresolvedExp("<", Syntax.Infix, new Exp[]{exp, exp2});
             }
        |
         < LE>
             exp2 = term2() {
-                return new UnresolvedFunCall("<=", Syntax.Infix, new Exp[]{exp, exp2});
+                return new UnresolvedExp("<=", Syntax.Infix, new Exp[]{exp, exp2});
             }
        |
         < GT>
             exp2 = term2() {
-                return new UnresolvedFunCall(">", Syntax.Infix, new Exp[]{exp, exp2});
+                return new UnresolvedExp(">", Syntax.Infix, new Exp[]{exp, exp2});
             }
        |
         < GE>
             exp2 = term2() {
-                return new UnresolvedFunCall(">=", Syntax.Infix, new Exp[]{exp, exp2});
+                return new UnresolvedExp(">=", Syntax.Infix, new Exp[]{exp, exp2});
             }
        |
         < EQ>
             exp2 = term2() {
-                return new UnresolvedFunCall("==", Syntax.Infix, new Exp[]{exp, exp2});
+                return new UnresolvedExp("==", Syntax.Infix, new Exp[]{exp, exp2});
             }
        |
         < NE>
             exp2 = term2() {
-                return new UnresolvedFunCall("!=", Syntax.Infix, new Exp[]{exp, exp2});
+                return new UnresolvedExp("!=", Syntax.Infix, new Exp[]{exp, exp2});
             }
     )?
     {
@@ -221,11 +227,11 @@ Exp term2():
     exp = term()
     (
         <PLUS> exp2 = term() {
-            exp = new UnresolvedFunCall("+", Syntax.Infix, new Exp[]{exp, exp2});
+            exp = new UnresolvedExp("+", Syntax.Infix, new Exp[]{exp, exp2});
         }
        |
         <MINUS> exp2 = term() {
-            exp = new UnresolvedFunCall("-", Syntax.Infix, new Exp[]{exp, exp2});
+            exp = new UnresolvedExp("-", Syntax.Infix, new Exp[]{exp, exp2});
         }
     )*
     { return exp ; }
@@ -239,11 +245,11 @@ Exp term():
     exp = factor()
     (
         <TIMES> exp2 = factor() {
-            exp = new UnresolvedFunCall("*", Syntax.Infix, new Exp[]{exp, exp2});
+            exp = new UnresolvedExp("*", Syntax.Infix, new Exp[]{exp, exp2});
         }
        |
         <DIVIDE> exp2 = factor() {
-            exp = new UnresolvedFunCall("/", Syntax.Infix, new Exp[]{exp, exp2});
+            exp = new UnresolvedExp("/", Syntax.Infix, new Exp[]{exp, exp2});
         }
     )*
     { return exp ; }
@@ -263,7 +269,7 @@ Exp factor() :
     }
    |
     <MINUS> exp = primary() {
-        return new UnresolvedFunCall("-", Syntax.Prefix, new Exp[] {exp});
+        return new UnresolvedExp("-", Syntax.Prefix, new Exp[] {exp});
     }
 }
 
@@ -274,19 +280,19 @@ Exp primary():
 {
 
     <NUMBER> {
-        return Literal.createNumber(token.image);
+        return LiteralExp.createNumber(token.image);
     }
    |
     <SINGLE_QUOTED_STRING> {
-        return Literal.createString(stripQuotes(token.image, "'", "'"));
+        return LiteralExp.createString(stripQuotes(token.image, "'", "'"));
     }
    |
     <DOUBLE_QUOTED_STRING> {
-        return Literal.createString(stripQuotes(token.image, DQ, DQ));
+        return LiteralExp.createString(stripQuotes(token.image, DQ, DQ));
     }
    |
     <VAR> {
-        return new UnresolvedFunCall(token.image, Syntax.Var, new Exp[0]);
+        return new UnresolvedExp(token.image, Syntax.Var, new Exp[0]);
     }
    |
     <LC> exp = expression() <RC> {
